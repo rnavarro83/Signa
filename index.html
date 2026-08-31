@@ -211,10 +211,13 @@
 <script>
   // ---- Contingut ----
   // NOTA: he assumit el patró "01.02.macarrons" seguint el de cacauet (01.01) — comprova-ho.
-  // NOTA: la categoria "Oci" i la paraula "Televisió" es van pujar a GitHub sense el prefix
-  // numèric de dos dígits (p. ex. "01.televisio.png"). El codi funciona igual perquè encara
-  // no hi ha res amb què ordenar-la, però si s'afegeixen més paraules dins d'Oci, cal renombrar
-  // els fitxers seguint el patró "NN.nom.ext" per mantenir l'ordre — i actualitzar aquí les URLs.
+  // NOTA sobre numeració (estat real a GitHub, no el patró ideal):
+  //  - oci/picto/01.televisio.png ja té prefix, però oci/video/televisió.mp4 encara no
+  //    (i conserva l'accent, per això la URL va amb %C3%B3).
+  //  - verb/picto/lavabo.png, verb/picto/lavabo/pipi.png i verb/picto/lavabo/caca.png
+  //    (i els .mp4 equivalents) es van pujar sense prefix numèric "02.", "02.01.", "02.02.".
+  //    Funciona igual, però si es vol mantenir la convenció de la resta del projecte,
+  //    cal renombrar-los a GitHub i actualitzar aquestes URLs.
   const CATEGORIES = [
     {
       id: "verb", label: "Verbs", color: "#4C9A6B", tint: "#BFE3CE",
@@ -229,8 +232,15 @@
             { id: "macarrons", label: "Macarrons", image: "https://rnavarro83.github.io/Signa/verb/picto/menjar/01.02.macarrons.png", video: "https://rnavarro83.github.io/Signa/verb/video/menjar/01.02.macarrons.mp4" },
           ]
         },
-        { id: "pipi", label: "Pipi", image: "https://rnavarro83.github.io/Signa/verb/picto/02.pipi.png", video: "https://rnavarro83.github.io/Signa/verb/video/02.pipi.mp4" },
-        { id: "caca", label: "Caca", image: "https://rnavarro83.github.io/Signa/verb/picto/03.caca.png", video: "https://rnavarro83.github.io/Signa/verb/video/03.caca.mp4" },
+        {
+          id: "lavabo", label: "Lavabo",
+          image: "https://rnavarro83.github.io/Signa/verb/picto/lavabo.png",
+          video: "https://rnavarro83.github.io/Signa/verb/video/lavabo.mp4",
+          children: [
+            { id: "pipi", label: "Pipi", image: "https://rnavarro83.github.io/Signa/verb/picto/lavabo/pipi.png", video: "https://rnavarro83.github.io/Signa/verb/video/lavabo/pipi.mp4" },
+            { id: "caca", label: "Caca", image: "https://rnavarro83.github.io/Signa/verb/picto/lavabo/caca.png", video: "https://rnavarro83.github.io/Signa/verb/video/lavabo/caca.mp4" },
+          ]
+        },
       ]
     },
     { id: "emocions", label: "Emocions", color: "#3E7CB8", tint: "#C7DEF2", emoji: "😊", children: [] },
@@ -240,7 +250,7 @@
       id: "oci", label: "Oci", color: "#C9A227", tint: "#F3E4A8",
       icon: "https://rnavarro83.github.io/Signa/principal/oci.png",
       children: [
-        { id: "televisio", label: "Televisió", image: "https://rnavarro83.github.io/Signa/oci/picto/televisi%C3%B3.png", video: "https://rnavarro83.github.io/Signa/oci/video/televisi%C3%B3.mp4" },
+        { id: "televisio", label: "Televisió", image: "https://rnavarro83.github.io/Signa/oci/picto/01.televisio.png", video: "https://rnavarro83.github.io/Signa/oci/video/televisi%C3%B3.mp4" },
       ]
     },
   ];
