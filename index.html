@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Comunicador — Prova</title>
+<style>
+  :root{
+    --bg: #F4F5F7;
+    --surface: #FFFFFF;
+    --text: #1F2530;
+    --text-dim: #767E8A;
+    --border: #E3E6EA;
+    --radius-tile: 14px;
+    --radius-lg: 24px;
+    --ok: #3E8E5B;
+    --err: #C1483C;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Verdana, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button { font-family: inherit; }
+
+  #app {
+    height: 100vh; height: 100dvh;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  #status {
+    flex-shrink: 0;
+    font-size: 0.7rem; text-align: center; padding: 4px 10px;
+    color: var(--text-dim); background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  #status[hidden] { display: none; }
+  #status.ok { color: var(--ok); font-weight: 600; }
+  #status.err { color: var(--err); font-weight: 600; }
+
+  #topbar {
+    flex-shrink: 0;
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .icon-btn {
+    flex-shrink: 0; width: 44px; height: 44px; border-radius: 13px; border: none;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .icon-btn:active { transform: scale(0.93); }
+  .icon-btn[disabled] { opacity: 0.35; pointer-events: none; }
+  #speak-btn { background: #20262E; color: white; }
+  #del-btn, #clear-btn { background: #F0F1F3; color: var(--text); }
+  #home-btn { background: #2D6CDF; color: white; }
+
+  #sentence-strip {
+    width: 100%; display: flex; align-items: center; gap: 6px;
+    background: #F0F1F3; border-radius: 13px; padding: 5px 8px; height: 38px;
+    overflow-x: auto; scrollbar-width: none;
+    margin-bottom: 8px;
+  }
+  #sentence-strip::-webkit-scrollbar { display: none; }
+  #sentence-strip .placeholder { color: var(--text-dim); font-size: 0.8rem; padding: 0 6px; white-space: nowrap; }
+  .chip {
+    flex-shrink: 0; display: flex; align-items: center; gap: 6px;
+    background: var(--surface); border: 2px solid var(--chip-color, #ccc);
+    border-radius: 999px; padding: 3px 10px 3px 3px; cursor: pointer;
+  }
+  .chip img { width: 22px; height: 22px; object-fit: contain; border-radius: 50%; background: #fff; }
+  .chip span { font-size: 0.8rem; font-weight: 700; white-space: nowrap; }
+
+  /* ---------- divisió en dues franges: vídeos a dalt, selecció a sota ---------- */
+  #main-split { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+  #left-panel {
+    height: 44%; flex-shrink: 0;
+    overflow-y: auto;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 10px 10px;
+  }
+  #left-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .empty-left {
+    color: var(--text-dim); font-size: 0.82rem; text-align: center;
+    border: 2px dashed var(--border); border-radius: var(--radius-lg);
+    padding: 18px 10px; margin-top: 6px;
+  }
+
+  #right-panel { flex: 1; min-height: 0; overflow-y: auto; }
+
+  /* ---------- targeta combinada (vídeo + picto), en graella al panell esquerre ---------- */
+  .combo-card { cursor: pointer; }
+  .video-frame {
+    position: relative; width: 100%; aspect-ratio: 4 / 5;
+    background: var(--tile-tint, #eee);
+    border-radius: 12px; overflow: hidden;
+    outline: 0px solid transparent; outline-offset: 2px;
+    transition: outline 0.12s ease, transform 0.12s ease;
+  }
+  .video-frame video { width: 100%; height: 100%; object-fit: contain; background: #0b0b0c; }
+  .video-status {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; color: var(--text-dim); font-size: 0.6rem; text-align: center; padding: 4px;
+  }
+  .video-status.err { color: #ffb4a8; }
+  .video-status[hidden] { display: none; }
+
+  .picto-frame {
+    position: relative; width: 100%; height: 32px; margin-top: 4px;
+    background: var(--tile-tint, #eee);
+    border-radius: 10px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    outline: 0px solid transparent; outline-offset: 2px;
+    transition: outline 0.12s ease;
+  }
+  .picto-frame img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+
+  .combo-word { margin-top: 3px; text-align: center; font-size: 0.7rem; font-weight: 800; color: var(--tile-color, var(--text)); line-height: 1.15; }
+
+  @keyframes activePulse { 0%, 100% { outline-width: 4px; } 50% { outline-width: 8px; } }
+  .combo-card.active .video-frame, .combo-card.active .picto-frame {
+    outline-color: var(--tile-color, #2E7D4F);
+    outline-width: 5px;
+    animation: activePulse 0.7s ease-in-out infinite;
+  }
+  .combo-card.active .combo-word { color: var(--tile-color, var(--text)); }
+
+  /* ---------- panell dret: navegació i graella ---------- */
+  .level-nav { display: flex; align-items: center; padding: 10px 12px 0; }
+  .back-btn {
+    width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.1); flex-shrink: 0;
+  }
+  .back-btn:active { transform: scale(0.93); }
+
+  header.top { padding: 14px 12px 4px; }
+  header.top h1 { margin: 0; font-size: 1.15rem; }
+  header.top p { margin: 3px 0 0; color: var(--text-dim); font-size: 0.8rem; }
+
+  main { padding: 10px 12px 24px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 12px; }
+  .tile {
+    border: none; padding: 0; cursor: pointer; overflow: hidden;
+    border-radius: var(--radius-tile);
+    display: flex; flex-direction: column;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    transition: transform 0.1s ease;
+  }
+  .tile:active { transform: scale(0.94); }
+
+  .tile-icon-area {
+    aspect-ratio: 1; background: var(--tile-tint, #ddd);
+    display: flex; align-items: center; justify-content: center; position: relative;
+  }
+  .tile-icon-area img { width: 100%; height: 100%; object-fit: contain; padding: 12px; }
+  .tile-icon-area .emoji { font-size: 2.2rem; }
+  .tile-icon-area .loading-dot {
+    width: 9px; height: 9px; border-radius: 50%; background: rgba(0,0,0,0.3);
+    animation: pulse 1s infinite ease-in-out;
+  }
+  .folder-badge {
+    position: absolute; top: 5px; right: 5px; width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(255,255,255,0.9); display: flex; align-items: center; justify-content: center;
+    font-size: 0.9rem; font-weight: 800; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+  @keyframes pulse { 0%,100%{opacity:0.3;} 50%{opacity:1;} }
+  .tile-error { color: var(--err); font-size: 0.65rem; text-align: center; padding: 4px; }
+
+  .tile-label { background: var(--surface); padding: 6px 4px; text-align: center; font-weight: 700; font-size: 0.8rem; color: var(--text); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tile, .loading-dot, .combo-card.active .video-frame, .combo-card.active .picto-frame { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+  <div id="app">
+    <div id="status">Connectant amb GitHub…</div>
+
+    <div id="topbar">
+      <button class="icon-btn" id="home-btn" aria-label="Torna a l'inici">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/></svg>
+      </button>
+      <button class="icon-btn" id="speak-btn" aria-label="Parla la frase" disabled>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 6a9 9 0 0 1 0 12"/></svg>
+      </button>
+      <button class="icon-btn" id="del-btn" aria-label="Esborra l'última paraula" disabled>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Z"/><path d="M13 9l6 6M19 9l-6 6"/></svg>
+      </button>
+      <button class="icon-btn" id="clear-btn" aria-label="Neteja tota la frase" disabled>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      </button>
+    </div>
+
+    <div id="main-split">
+      <div id="left-panel">
+        <div id="sentence-strip"><span class="placeholder">Toca paraules per formar una frase…</span></div>
+        <div id="left-grid"></div>
+      </div>
+      <div id="right-panel">
+        <div id="view"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ---- Contingut ----
+  // NOTA: he assumit el patró "01.02.macarrons" seguint el de cacauet (01.01) — comprova-ho.
+  // NOTA sobre numeració (estat real a GitHub, no el patró ideal):
+  //  - oci/picto/01.televisio.png ja té prefix, però oci/video/televisió.mp4 encara no
+  //    (i conserva l'accent, per això la URL va amb %C3%B3).
+  //  - verb/picto/lavabo.png, verb/picto/lavabo/pipi.png i verb/picto/lavabo/caca.png
+  //    (i els .mp4 equivalents) es van pujar sense prefix numèric "02.", "02.01.", "02.02.".
+  //    Funciona igual, però si es vol mantenir la convenció de la resta del projecte,
+  //    cal renombrar-los a GitHub i actualitzar aquestes URLs.
+  const CATEGORIES = [
+    {
+      id: "verb", label: "Verbs", color: "#4C9A6B", tint: "#BFE3CE",
+      icon: "https://signa17.github.io/Signa/principal/verb.png",
+      children: [
+        {
+          id: "menjar", label: "Menjar",
+          image: "https://signa17.github.io/Signa/verb/picto/01.menjar.png",
+          video: "https://signa17.github.io/Signa/verb/video/01.menjar.mp4",
+          children: [
+            { id: "cacauet",   label: "Cacauet",   image: "https://signa17.github.io/Signa/verb/picto/menjar/01.01.cacauet.png",   video: "https://signa17.github.io/Signa/verb/video/menjar/01.01.cacauet.mp4" },
+            { id: "macarrons", label: "Macarrons", image: "https://signa17.github.io/Signa/verb/picto/menjar/01.02.macarrons.png", video: "https://signa17.github.io/Signa/verb/video/menjar/01.02.macarrons.mp4" },
+          ]
+        },
+        {
+          id: "lavabo", label: "Lavabo",
+          image: "https://signa17.github.io/Signa/verb/picto/lavabo.png",
+          video: "https://signa17.github.io/Signa/verb/video/lavabo.mp4",
+          children: [
+            { id: "pipi", label: "Pipi", image: "https://signa17.github.io/Signa/verb/picto/lavabo/pipi.png", video: "https://signa17.github.io/Signa/verb/video/lavabo/pipi.mp4" },
+            { id: "caca", label: "Caca", image: "https://signa17.github.io/Signa/verb/picto/lavabo/caca.png", video: "https://signa17.github.io/Signa/verb/video/lavabo/caca.mp4" },
+          ]
+        },
+      ]
+    },
+    { id: "emocions", label: "Emocions", color: "#3E7CB8", tint: "#C7DEF2", emoji: "😊", children: [] },
+    { id: "persones", label: "Persones", color: "#DB8A3E", tint: "#F6DDBE", emoji: "🧑‍🤝‍🧑", children: [] },
+    { id: "llocs",    label: "Llocs",    color: "#8868B0", tint: "#E1D3F0", emoji: "📍", children: [] },
+    {
+      id: "oci", label: "Oci", color: "#C9A227", tint: "#F3E4A8",
+      icon: "https://signa17.github.io/Signa/principal/oci.png",
+      children: [
+        { id: "televisio", label: "Televisió", image: "https://signa17.github.io/Signa/oci/picto/01.televisio.png", video: "https://signa17.github.io/Signa/oci/video/televisi%C3%B3.mp4" },
+      ]
+    },
+  ];
+
+  const view = document.getElementById("view");
+  const statusEl = document.getElementById("status");
+  const sentenceStrip = document.getElementById("sentence-strip");
+  const speakBtn = document.getElementById("speak-btn");
+  const delBtn = document.getElementById("del-btn");
+  const clearBtn = document.getElementById("clear-btn");
+  const leftGrid = document.getElementById("left-grid");
+
+  let navStack = [];
+  let currentColor = null;
+  let currentTint = null;
+  let loadResults = {};
+  let phrase = []; // { id, label, image, video, color, tint }
+
+  // ---------- veu ----------
+  function speak(text) {
+    try {
+      if (!("speechSynthesis" in window)) return;
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "ca-ES";
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+  function speakWordAndWait(text) {
+    return new Promise((resolve) => {
+      try {
+        if (!("speechSynthesis" in window)) { resolve(); return; }
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = "ca-ES";
+        u.onend = () => resolve();
+        u.onerror = () => resolve();
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(u);
+      } catch (e) { resolve(); }
+    });
+  }
+
+  // ---------- estat de connexió ----------
+  function updateStatus() {
+    const results = Object.values(loadResults);
+    if (results.length === 0) { statusEl.hidden = false; statusEl.textContent = "Connectant amb GitHub…"; statusEl.className = ""; return; }
+    const ok = results.filter((r) => r === "ok").length;
+    const err = results.filter((r) => r === "error").length;
+    const pending = results.filter((r) => r === "loading").length;
+    if (pending > 0) { statusEl.hidden = false; statusEl.textContent = `Carregant… (${ok}/${results.length})`; statusEl.className = ""; }
+    else if (err === 0) { statusEl.hidden = true; statusEl.className = "ok"; }
+    else { statusEl.hidden = false; statusEl.textContent = `⚠ ${err} de ${results.length} elements amb error`; statusEl.className = "err"; }
+  }
+  function loadImageInto(wrapId, src, key) {
+    loadResults[key] = "loading";
+    const img = new Image();
+    img.onload = () => { loadResults[key] = "ok"; const w = document.getElementById(wrapId); if (w) { w.innerHTML = ""; w.appendChild(img); } updateStatus(); };
+    img.onerror = () => { loadResults[key] = "error"; const w = document.getElementById(wrapId); if (w) w.innerHTML = `<div class="tile-error">✕ Error</div>`; updateStatus(); };
+    img.src = src;
+    updateStatus();
+  }
+
+  // ---------- barra de frase superior ----------
+  function renderSentenceStrip() {
+    sentenceStrip.innerHTML = "";
+    if (phrase.length === 0) {
+      sentenceStrip.innerHTML = `<span class="placeholder">Toca paraules per formar una frase…</span>`;
+    } else {
+      phrase.forEach((w, idx) => {
+        const chip = document.createElement("button");
+        chip.className = "chip";
+        chip.style.setProperty("--chip-color", w.color);
+        chip.innerHTML = `<img src="${w.image}" alt="" /><span>${w.label}</span>`;
+        chip.addEventListener("click", () => replayWord(idx));
+        sentenceStrip.appendChild(chip);
+      });
+      sentenceStrip.scrollLeft = sentenceStrip.scrollWidth;
+    }
+    speakBtn.disabled = phrase.length === 0;
+    delBtn.disabled = phrase.length === 0;
+    clearBtn.disabled = phrase.length === 0;
+  }
+
+  delBtn.addEventListener("click", () => { phrase.pop(); renderSentenceStrip(); renderLeftPanel(); renderLevel(); });
+  clearBtn.addEventListener("click", () => { phrase = []; renderSentenceStrip(); renderLeftPanel(); renderLevel(); });
+  speakBtn.addEventListener("click", () => { if (!speakBtn.disabled) speakPhraseSequential(); });
+
+  document.getElementById("home-btn").addEventListener("click", () => {
+    navStack = [];
+    currentColor = null;
+    currentTint = null;
+    phrase = [];
+    renderSentenceStrip();
+    renderLeftPanel();
+    renderLevel();
+  });
+
+  // ---------- cua de vídeos: mai dos alhora, el següent espera que acabi l'anterior ----------
+  // ---------- cua de vídeos + veu sincronitzada ----------
+  // Mai dos vídeos alhora. La veu d'una paraula no sona fins que el seu vídeo
+  // comença a reproduir's de veritat (esdeveniment "playing"), per evitar el desfase.
+  let activeVideo = null;
+  const videoQueue = [];
+
+  function waitForTurn() {
+    return new Promise((resolve) => {
+      if (activeVideo === null) { activeVideo = "pending"; resolve(); }
+      else videoQueue.push(resolve);
+    });
+  }
+  function releaseTurn() {
+    activeVideo = null;
+    const next = videoQueue.shift();
+    if (next) { activeVideo = "pending"; next(); }
+  }
+  function whenVideoReady(videoEl) {
+    return new Promise((resolve) => {
+      if (videoEl.readyState >= 2) { resolve(); return; }
+      const done = () => { cleanup(); resolve(); };
+      const cleanup = () => {
+        videoEl.removeEventListener("loadeddata", done);
+        videoEl.removeEventListener("canplay", done);
+        videoEl.removeEventListener("error", done);
+      };
+      videoEl.addEventListener("loadeddata", done);
+      videoEl.addEventListener("canplay", done);
+      videoEl.addEventListener("error", done); // no bloquegem la veu si el vídeo falla
+    });
+  }
+
+  // Reprodueix videoEl (esperant el seu torn); crida onStart() just quan arrenca
+  // de veritat (o si es rendeix després de reintentar). Es resol quan acaba.
+  async function requestVideo(videoEl, onStart) {
+    await waitForTurn();
+    activeVideo = videoEl;
+    await whenVideoReady(videoEl);
+    return new Promise((resolveEnded) => {
+      let started = false;
+      const onEnded = () => {
+        videoEl.removeEventListener("ended", onEnded);
+        videoEl.removeEventListener("playing", onPlaying);
+        releaseTurn();
+        resolveEnded();
+      };
+      const onPlaying = () => { started = true; if (onStart) onStart(); };
+      videoEl.addEventListener("ended", onEnded);
+      videoEl.addEventListener("playing", onPlaying);
+      try { videoEl.currentTime = 0; } catch (e) {}
+      let attempts = 0;
+      const attemptPlay = () => {
+        attempts++;
+        const p = videoEl.play();
+        if (p && p.catch) p.catch(() => {});
+        setTimeout(() => {
+          if (started) return;
+          if (attempts < 5) attemptPlay();
+          else { if (onStart) onStart(); onEnded(); } // es rendeix: parla igualment i allibera la cua
+        }, 200);
+      };
+      attemptPlay();
+    });
+  }
+
+  // ---------- panell esquerre: targetes combinades (vídeo + picto), apilades ----------
+  function setupVideoElement(videoEl, statusEl, src) {
+    statusEl.hidden = false; statusEl.className = "video-status";
+    statusEl.innerHTML = `<div class="loading-dot"></div><span>Carregant…</span>`;
+    videoEl.style.display = "none";
+    const showReady = () => { statusEl.hidden = true; videoEl.style.display = "block"; };
+    videoEl.addEventListener("loadeddata", showReady, { once: true });
+    videoEl.addEventListener("canplay", showReady, { once: true });
+    videoEl.addEventListener("error", () => {
+      statusEl.hidden = false; statusEl.className = "video-status err";
+      statusEl.innerHTML = `✕<br>No disponible`;
+    });
+    videoEl.src = src;
+    videoEl.load();
+  }
+
+  function buildComboCard(word, idx) {
+    const card = document.createElement("div");
+    card.className = "combo-card";
+    card.id = `combo-card-${idx}`;
+    card.innerHTML = `
+      <div class="video-frame" style="--tile-tint:${word.tint}; --tile-color:${word.color}">
+        <video muted playsinline webkit-playsinline="true"></video>
+        <div class="video-status" hidden></div>
+      </div>
+      <div class="picto-frame" style="--tile-tint:${word.tint}; --tile-color:${word.color}">
+        <img src="${word.image}" alt="" />
+      </div>
+      <div class="combo-word" style="--tile-color:${word.color}">${word.label}</div>
+    `;
+    const videoEl = card.querySelector("video");
+    const statusEl = card.querySelector(".video-status");
+    setupVideoElement(videoEl, statusEl, word.video);
+    card.addEventListener("click", () => replayWord(idx));
+    return card;
+  }
+
+  function appendLeftCard(word) {
+    const idx = phrase.length - 1;
+    const card = buildComboCard(word, idx);
+    leftGrid.appendChild(card);
+    leftGrid.scrollIntoView({ behavior: "smooth", block: "end" });
+    return card;
+  }
+
+  function renderLeftPanel() {
+    leftGrid.innerHTML = "";
+    if (phrase.length === 0) return;
+    phrase.forEach((word, idx) => leftGrid.appendChild(buildComboCard(word, idx)));
+  }
+
+  // ---------- repetir signe + paraula ----------
+  function replayWord(idx) {
+    const word = phrase[idx];
+    if (!word) return;
+    const card = document.getElementById(`combo-card-${idx}`);
+    const videoEl = card ? card.querySelector("video") : null;
+    flashActive(idx, 900);
+    if (videoEl) requestVideo(videoEl, () => speak(word.label));
+    else speak(word.label);
+  }
+  function flashActive(idx, ms) {
+    const card = document.getElementById(`combo-card-${idx}`);
+    if (!card) return;
+    card.classList.add("active");
+    setTimeout(() => card.classList.remove("active"), ms);
+  }
+
+  async function speakPhraseSequential() {
+    if (phrase.length === 0) return;
+    speakBtn.disabled = true; delBtn.disabled = true; clearBtn.disabled = true;
+    for (let i = 0; i < phrase.length; i++) {
+      const word = phrase[i];
+      const card = document.getElementById(`combo-card-${i}`);
+      if (card) card.classList.add("active");
+      if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
+      const videoEl = card ? card.querySelector("video") : null;
+      if (videoEl) {
+        await requestVideo(videoEl, () => speak(word.label));
+      } else {
+        await speakWordAndWait(word.label);
+      }
+      if (card) card.classList.remove("active");
+    }
+    speakBtn.disabled = phrase.length === 0;
+    delBtn.disabled = phrase.length === 0;
+    clearBtn.disabled = phrase.length === 0;
+  }
+
+  function selectWord(node, ctx) {
+    const enriched = { ...node, color: ctx.color, tint: ctx.tint };
+    phrase.push(enriched);
+    renderSentenceStrip();
+    const card = appendLeftCard(enriched);
+    const videoEl = card.querySelector("video");
+    requestVideo(videoEl, () => speak(node.label));
+  }
+
+  // ---------- panell dret: navegació per nivells ----------
+  function isInPhrase(id) { return phrase.some((w) => w.id === id); }
+
+  function currentChildren() {
+    return navStack.length === 0 ? CATEGORIES : navStack[navStack.length - 1].children;
+  }
+  function openNode(node) {
+    navStack.push(node);
+    if (navStack.length === 1) { currentColor = node.color; currentTint = node.tint; }
+    renderLevel();
+  }
+  function goBackOneLevel() {
+    navStack.pop();
+    if (navStack.length === 0) { currentColor = null; currentTint = null; }
+    renderLevel();
+  }
+
+  function buildTile({ color, tint, label, image, emoji, hasChildren, onClick }, idPrefix) {
+    const tile = document.createElement("button");
+    tile.className = "tile";
+    const wrapId = `${idPrefix}-${label}-${Math.random().toString(36).slice(2, 7)}`;
+    tile.innerHTML = `
+      <div class="tile-icon-area" id="${wrapId}" style="--tile-tint:${tint}">
+        ${emoji ? `<span class="emoji">${emoji}</span>` : `<div class="loading-dot"></div>`}
+        ${hasChildren ? `<span class="folder-badge">›</span>` : ""}
+      </div>
+      <div class="tile-label">${label}</div>
+    `;
+    tile.addEventListener("click", onClick);
+    if (!emoji && image) loadImageInto(wrapId, image, wrapId);
+    return tile;
+  }
+
+  function renderLevel() {
+    const nodes = currentChildren();
+    const atHome = navStack.length === 0;
+    const parent = atHome ? null : navStack[navStack.length - 1];
+    const visibleNodes = atHome ? nodes : nodes.filter((n) => !isInPhrase(n.id));
+
+    view.innerHTML = atHome
+      ? `<header class="top"><h1>El meu Comunicador</h1><p>Toca una categoria</p></header>
+         <main><div class="grid" id="grid"></div></main>`
+      : `<div class="level-nav">
+           <button class="back-btn" id="back-btn" aria-label="Enrere, torna a ${parent.label}">
+             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1F2530" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+           </button>
+         </div>
+         <main>${visibleNodes.length === 0 ? `<div class="empty-left" style="margin-top:16px;">No hi ha més paraules aquí</div>` : `<div class="grid" id="grid"></div>`}</main>`;
+
+    if (!atHome) document.getElementById("back-btn").addEventListener("click", goBackOneLevel);
+
+    if (visibleNodes.length > 0) {
+      const grid = document.getElementById("grid");
+      visibleNodes.forEach((node) => {
+        const color = atHome ? node.color : currentColor;
+        const tint = atHome ? node.tint : currentTint;
+        const hasChildren = !!(node.children && node.children.length > 0);
+        const onClick = atHome
+          ? () => openNode(node)
+          : () => { selectWord(node, { color, tint }); if (hasChildren) openNode(node); };
+        grid.appendChild(buildTile({
+          color, tint,
+          label: atHome ? node.label.toUpperCase() : node.label,
+          image: node.image || node.icon, emoji: node.emoji, hasChildren,
+          onClick
+        }, "node"));
+      });
+    }
+  }
+
+  renderLevel();
+  renderSentenceStrip();
+</script>
+</body>
+</html>
