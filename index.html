@@ -76,7 +76,7 @@
   #main-split { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
   #left-panel {
-    height: 44%; flex-shrink: 0;
+    height: 32%; flex-shrink: 0;
     overflow-y: auto;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
@@ -94,7 +94,7 @@
   /* ---------- targeta combinada (vídeo + picto), en graella al panell esquerre ---------- */
   .combo-card { cursor: pointer; }
   .video-frame {
-    position: relative; width: 100%; aspect-ratio: 4 / 5;
+    position: relative; width: 100%; aspect-ratio: 4 / 3;
     background: var(--tile-tint, #eee);
     border-radius: 12px; overflow: hidden;
     outline: 0px solid transparent; outline-offset: 2px;
@@ -348,69 +348,54 @@
     renderLevel();
   });
 
-  // ---------- cua de vídeos: mai dos alhora, el següent espera que acabi l'anterior ----------
-  // ---------- cua de vídeos + veu sincronitzada ----------
-  // Mai dos vídeos alhora. La veu d'una paraula no sona fins que el seu vídeo
-  // comença a reproduir's de veritat (esdeveniment "playing"), per evitar el desfase.
+  // ---------- cua de vídeos: mai dos alhora ----------
+  // La veu es dispara SEMPRE de manera immediata i síncrona al toc de l'usuari
+  // (Safari a iOS bloqueja speechSynthesis en silenci si es crida més tard, encara
+  // que sigui per esperar el vídeo). El vídeo va per la seva banda, en cua.
   let activeVideo = null;
   const videoQueue = [];
 
-  function waitForTurn() {
-    return new Promise((resolve) => {
-      if (activeVideo === null) { activeVideo = "pending"; resolve(); }
-      else videoQueue.push(resolve);
-    });
-  }
-  function releaseTurn() {
-    activeVideo = null;
-    const next = videoQueue.shift();
-    if (next) { activeVideo = "pending"; next(); }
-  }
-  function whenVideoReady(videoEl) {
-    return new Promise((resolve) => {
-      if (videoEl.readyState >= 2) { resolve(); return; }
-      const done = () => { cleanup(); resolve(); };
-      const cleanup = () => {
-        videoEl.removeEventListener("loadeddata", done);
-        videoEl.removeEventListener("canplay", done);
-        videoEl.removeEventListener("error", done);
-      };
-      videoEl.addEventListener("loadeddata", done);
-      videoEl.addEventListener("canplay", done);
-      videoEl.addEventListener("error", done); // no bloquegem la veu si el vídeo falla
-    });
-  }
-
-  // Reprodueix videoEl (esperant el seu torn); crida onStart() just quan arrenca
-  // de veritat (o si es rendeix després de reintentar). Es resol quan acaba.
-  async function requestVideo(videoEl, onStart) {
-    await waitForTurn();
-    activeVideo = videoEl;
-    await whenVideoReady(videoEl);
+  function playVideoQueued(videoEl) {
     return new Promise((resolveEnded) => {
-      let started = false;
-      const onEnded = () => {
-        videoEl.removeEventListener("ended", onEnded);
-        videoEl.removeEventListener("playing", onPlaying);
-        releaseTurn();
-        resolveEnded();
+      const run = () => {
+        activeVideo = videoEl;
+        let started = false;
+        const onEnded = () => {
+          videoEl.removeEventListener("ended", onEnded);
+          videoEl.removeEventListener("playing", onPlaying);
+          if (activeVideo === videoEl) activeVideo = null;
+          resolveEnded();
+          const next = videoQueue.shift();
+          if (next) next();
+        };
+        const onPlaying = () => { started = true; };
+        videoEl.addEventListener("ended", onEnded);
+        videoEl.addEventListener("playing", onPlaying);
+        const startPlaying = () => {
+          try { videoEl.currentTime = 0; } catch (e) {}
+          let attempts = 0;
+          const attemptPlay = () => {
+            attempts++;
+            const p = videoEl.play();
+            if (p && p.catch) p.catch(() => {});
+            setTimeout(() => {
+              if (started) return;
+              if (attempts < 5) attemptPlay();
+              else onEnded(); // es rendeix, allibera la cua per al següent
+            }, 200);
+          };
+          attemptPlay();
+        };
+        if (videoEl.readyState >= 2) startPlaying();
+        else {
+          const onReady = () => { startPlaying(); };
+          videoEl.addEventListener("loadeddata", onReady, { once: true });
+          videoEl.addEventListener("canplay", onReady, { once: true });
+          videoEl.addEventListener("error", onEnded, { once: true });
+        }
       };
-      const onPlaying = () => { started = true; if (onStart) onStart(); };
-      videoEl.addEventListener("ended", onEnded);
-      videoEl.addEventListener("playing", onPlaying);
-      try { videoEl.currentTime = 0; } catch (e) {}
-      let attempts = 0;
-      const attemptPlay = () => {
-        attempts++;
-        const p = videoEl.play();
-        if (p && p.catch) p.catch(() => {});
-        setTimeout(() => {
-          if (started) return;
-          if (attempts < 5) attemptPlay();
-          else { if (onStart) onStart(); onEnded(); } // es rendeix: parla igualment i allibera la cua
-        }, 200);
-      };
-      attemptPlay();
+      if (activeVideo === null) run();
+      else videoQueue.push(run);
     });
   }
 
@@ -470,10 +455,10 @@
     const word = phrase[idx];
     if (!word) return;
     const card = document.getElementById(`combo-card-${idx}`);
-    const videoEl = card ? card.querySelector("video") : null;
     flashActive(idx, 900);
-    if (videoEl) requestVideo(videoEl, () => speak(word.label));
-    else speak(word.label);
+    speak(word.label);
+    const videoEl = card ? card.querySelector("video") : null;
+    if (videoEl) playVideoQueued(videoEl);
   }
   function flashActive(idx, ms) {
     const card = document.getElementById(`combo-card-${idx}`);
@@ -488,14 +473,13 @@
     for (let i = 0; i < phrase.length; i++) {
       const word = phrase[i];
       const card = document.getElementById(`combo-card-${i}`);
-      if (card) card.classList.add("active");
-      if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
-      const videoEl = card ? card.querySelector("video") : null;
-      if (videoEl) {
-        await requestVideo(videoEl, () => speak(word.label));
-      } else {
-        await speakWordAndWait(word.label);
+      if (card) {
+        card.classList.add("active");
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
+        const videoEl = card.querySelector("video");
+        if (videoEl) playVideoQueued(videoEl);
       }
+      await speakWordAndWait(word.label);
       if (card) card.classList.remove("active");
     }
     speakBtn.disabled = phrase.length === 0;
@@ -507,9 +491,10 @@
     const enriched = { ...node, color: ctx.color, tint: ctx.tint };
     phrase.push(enriched);
     renderSentenceStrip();
+    speak(node.label);
     const card = appendLeftCard(enriched);
     const videoEl = card.querySelector("video");
-    requestVideo(videoEl, () => speak(node.label));
+    playVideoQueued(videoEl);
   }
 
   // ---------- panell dret: navegació per nivells ----------
