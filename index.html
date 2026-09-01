@@ -35,14 +35,13 @@
     font-size: 0.7rem; text-align: center; padding: 4px 10px;
     color: var(--text-dim); background: var(--surface); border-bottom: 1px solid var(--border);
   }
-  #status[hidden] { display: none; }
   #status.ok { color: var(--ok); font-weight: 600; }
   #status.err { color: var(--err); font-weight: 600; }
 
   #topbar {
     flex-shrink: 0;
     display: flex; align-items: center; gap: 8px;
-    padding: 6px 10px;
+    padding: 8px 10px;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
   }
@@ -57,10 +56,9 @@
   #home-btn { background: #2D6CDF; color: white; }
 
   #sentence-strip {
-    width: 100%; display: flex; align-items: center; gap: 6px;
-    background: #F0F1F3; border-radius: 13px; padding: 5px 8px; height: 38px;
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px;
+    background: #F0F1F3; border-radius: 13px; padding: 6px 8px; height: 44px;
     overflow-x: auto; scrollbar-width: none;
-    margin-bottom: 8px;
   }
   #sentence-strip::-webkit-scrollbar { display: none; }
   #sentence-strip .placeholder { color: var(--text-dim); font-size: 0.8rem; padding: 0 6px; white-space: nowrap; }
@@ -76,13 +74,13 @@
   #main-split { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
   #left-panel {
-    height: 32%; flex-shrink: 0;
+    height: 42%; flex-shrink: 0;
     overflow-y: auto;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
-    padding: 8px 10px 10px;
+    padding: 12px 12px 14px;
   }
-  #left-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  #left-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .empty-left {
     color: var(--text-dim); font-size: 0.82rem; text-align: center;
     border: 2px dashed var(--border); border-radius: var(--radius-lg);
@@ -109,7 +107,7 @@
   .video-status[hidden] { display: none; }
 
   .picto-frame {
-    position: relative; width: 100%; height: 32px; margin-top: 4px;
+    position: relative; width: 100%; height: 40px; margin-top: 5px;
     background: var(--tile-tint, #eee);
     border-radius: 10px; overflow: hidden;
     display: flex; align-items: center; justify-content: center;
@@ -118,7 +116,7 @@
   }
   .picto-frame img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
 
-  .combo-word { margin-top: 3px; text-align: center; font-size: 0.7rem; font-weight: 800; color: var(--tile-color, var(--text)); line-height: 1.15; }
+  .combo-word { margin-top: 4px; text-align: center; font-size: 0.72rem; font-weight: 800; color: var(--tile-color, var(--text)); line-height: 1.15; }
 
   @keyframes activePulse { 0%, 100% { outline-width: 4px; } 50% { outline-width: 8px; } }
   .combo-card.active .video-frame, .combo-card.active .picto-frame {
@@ -189,6 +187,7 @@
       <button class="icon-btn" id="speak-btn" aria-label="Parla la frase" disabled>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 6a9 9 0 0 1 0 12"/></svg>
       </button>
+      <div id="sentence-strip"><span class="placeholder">Toca paraules per formar una frase…</span></div>
       <button class="icon-btn" id="del-btn" aria-label="Esborra l'última paraula" disabled>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Z"/><path d="M13 9l6 6M19 9l-6 6"/></svg>
       </button>
@@ -199,8 +198,9 @@
 
     <div id="main-split">
       <div id="left-panel">
-        <div id="sentence-strip"><span class="placeholder">Toca paraules per formar una frase…</span></div>
-        <div id="left-grid"></div>
+        <div id="left-grid">
+          <div class="empty-left" id="empty-left" style="grid-column: 1 / -1;">Toca un pictograma per veure el vídeo i la imatge aquí</div>
+        </div>
       </div>
       <div id="right-panel">
         <div id="view"></div>
@@ -210,7 +210,6 @@
 
 <script>
   // ---- Contingut ----
-  // NOTA: he assumit el patró "01.02.macarrons" seguint el de cacauet (01.01) — comprova-ho.
   // NOTA sobre numeració (estat real a GitHub, no el patró ideal):
   //  - oci/picto/01.televisio.png ja té prefix, però oci/video/televisió.mp4 encara no
   //    (i conserva l'accent, per això la URL va amb %C3%B3).
@@ -262,6 +261,7 @@
   const delBtn = document.getElementById("del-btn");
   const clearBtn = document.getElementById("clear-btn");
   const leftGrid = document.getElementById("left-grid");
+  const emptyLeft = document.getElementById("empty-left");
 
   let navStack = [];
   let currentColor = null;
@@ -296,13 +296,13 @@
   // ---------- estat de connexió ----------
   function updateStatus() {
     const results = Object.values(loadResults);
-    if (results.length === 0) { statusEl.hidden = false; statusEl.textContent = "Connectant amb GitHub…"; statusEl.className = ""; return; }
+    if (results.length === 0) { statusEl.textContent = "Connectant amb GitHub…"; statusEl.className = ""; return; }
     const ok = results.filter((r) => r === "ok").length;
     const err = results.filter((r) => r === "error").length;
     const pending = results.filter((r) => r === "loading").length;
-    if (pending > 0) { statusEl.hidden = false; statusEl.textContent = `Carregant… (${ok}/${results.length})`; statusEl.className = ""; }
-    else if (err === 0) { statusEl.hidden = true; statusEl.className = "ok"; }
-    else { statusEl.hidden = false; statusEl.textContent = `⚠ ${err} de ${results.length} elements amb error`; statusEl.className = "err"; }
+    if (pending > 0) { statusEl.textContent = `Carregant… (${ok}/${results.length})`; statusEl.className = ""; }
+    else if (err === 0) { statusEl.textContent = `✓ ${ok}/${results.length} elements carregats`; statusEl.className = "ok"; }
+    else { statusEl.textContent = `⚠ ${err} de ${results.length} elements amb error`; statusEl.className = "err"; }
   }
   function loadImageInto(wrapId, src, key) {
     loadResults[key] = "loading";
@@ -348,71 +348,21 @@
     renderLevel();
   });
 
-  // ---------- cua de vídeos: mai dos alhora ----------
-  // La veu es dispara SEMPRE de manera immediata i síncrona al toc de l'usuari
-  // (Safari a iOS bloqueja speechSynthesis en silenci si es crida més tard, encara
-  // que sigui per esperar el vídeo). El vídeo va per la seva banda, en cua.
-  let activeVideo = null;
-  const videoQueue = [];
-
-  function playVideoQueued(videoEl) {
-    return new Promise((resolveEnded) => {
-      const run = () => {
-        activeVideo = videoEl;
-        let started = false;
-        const onEnded = () => {
-          videoEl.removeEventListener("ended", onEnded);
-          videoEl.removeEventListener("playing", onPlaying);
-          if (activeVideo === videoEl) activeVideo = null;
-          resolveEnded();
-          const next = videoQueue.shift();
-          if (next) next();
-        };
-        const onPlaying = () => { started = true; };
-        videoEl.addEventListener("ended", onEnded);
-        videoEl.addEventListener("playing", onPlaying);
-        const startPlaying = () => {
-          try { videoEl.currentTime = 0; } catch (e) {}
-          let attempts = 0;
-          const attemptPlay = () => {
-            attempts++;
-            const p = videoEl.play();
-            if (p && p.catch) p.catch(() => {});
-            setTimeout(() => {
-              if (started) return;
-              if (attempts < 5) attemptPlay();
-              else onEnded(); // es rendeix, allibera la cua per al següent
-            }, 200);
-          };
-          attemptPlay();
-        };
-        if (videoEl.readyState >= 2) startPlaying();
-        else {
-          const onReady = () => { startPlaying(); };
-          videoEl.addEventListener("loadeddata", onReady, { once: true });
-          videoEl.addEventListener("canplay", onReady, { once: true });
-          videoEl.addEventListener("error", onEnded, { once: true });
-        }
-      };
-      if (activeVideo === null) run();
-      else videoQueue.push(run);
-    });
-  }
-
   // ---------- panell esquerre: targetes combinades (vídeo + picto), apilades ----------
   function setupVideoElement(videoEl, statusEl, src) {
     statusEl.hidden = false; statusEl.className = "video-status";
     statusEl.innerHTML = `<div class="loading-dot"></div><span>Carregant…</span>`;
     videoEl.style.display = "none";
-    const showReady = () => { statusEl.hidden = true; videoEl.style.display = "block"; };
-    videoEl.addEventListener("loadeddata", showReady, { once: true });
-    videoEl.addEventListener("canplay", showReady, { once: true });
+    const tryPlay = () => { statusEl.hidden = true; videoEl.style.display = "block"; videoEl.play().catch(() => {}); };
+    videoEl.addEventListener("loadeddata", tryPlay);
+    videoEl.addEventListener("canplay", tryPlay);
+    videoEl.addEventListener("playing", tryPlay);
     videoEl.addEventListener("error", () => {
       statusEl.hidden = false; statusEl.className = "video-status err";
       statusEl.innerHTML = `✕<br>No disponible`;
     });
     videoEl.src = src;
-    videoEl.load();
+    videoEl.play().catch(() => {});
   }
 
   function buildComboCard(word, idx) {
@@ -437,16 +387,18 @@
   }
 
   function appendLeftCard(word) {
+    if (emptyLeft) emptyLeft.hidden = true;
     const idx = phrase.length - 1;
-    const card = buildComboCard(word, idx);
-    leftGrid.appendChild(card);
+    leftGrid.appendChild(buildComboCard(word, idx));
     leftGrid.scrollIntoView({ behavior: "smooth", block: "end" });
-    return card;
   }
 
   function renderLeftPanel() {
     leftGrid.innerHTML = "";
-    if (phrase.length === 0) return;
+    if (phrase.length === 0) {
+      leftGrid.innerHTML = `<div class="empty-left" id="empty-left" style="grid-column: 1 / -1;">Toca un pictograma per veure el vídeo i la imatge aquí</div>`;
+      return;
+    }
     phrase.forEach((word, idx) => leftGrid.appendChild(buildComboCard(word, idx)));
   }
 
@@ -455,10 +407,10 @@
     const word = phrase[idx];
     if (!word) return;
     const card = document.getElementById(`combo-card-${idx}`);
+    const videoEl = card ? card.querySelector("video") : null;
+    if (videoEl) { videoEl.currentTime = 0; videoEl.play().catch(() => {}); }
     flashActive(idx, 900);
     speak(word.label);
-    const videoEl = card ? card.querySelector("video") : null;
-    if (videoEl) playVideoQueued(videoEl);
   }
   function flashActive(idx, ms) {
     const card = document.getElementById(`combo-card-${idx}`);
@@ -475,26 +427,22 @@
       const card = document.getElementById(`combo-card-${i}`);
       if (card) {
         card.classList.add("active");
-        card.scrollIntoView({ behavior: "smooth", block: "center" });
         const videoEl = card.querySelector("video");
-        if (videoEl) playVideoQueued(videoEl);
+        if (videoEl) { videoEl.currentTime = 0; videoEl.play().catch(() => {}); }
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
       }
       await speakWordAndWait(word.label);
       if (card) card.classList.remove("active");
     }
-    speakBtn.disabled = phrase.length === 0;
-    delBtn.disabled = phrase.length === 0;
-    clearBtn.disabled = phrase.length === 0;
+    renderSentenceStrip();
   }
 
   function selectWord(node, ctx) {
     const enriched = { ...node, color: ctx.color, tint: ctx.tint };
     phrase.push(enriched);
     renderSentenceStrip();
+    appendLeftCard(enriched);
     speak(node.label);
-    const card = appendLeftCard(enriched);
-    const videoEl = card.querySelector("video");
-    playVideoQueued(videoEl);
   }
 
   // ---------- panell dret: navegació per nivells ----------
