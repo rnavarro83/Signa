@@ -135,10 +135,6 @@
   }
   .back-btn:active { transform: scale(0.93); }
 
-  header.top { padding: 14px 12px 4px; }
-  header.top h1 { margin: 0; font-size: 1.15rem; }
-  header.top p { margin: 3px 0 0; color: var(--text-dim); font-size: 0.8rem; }
-
   main { padding: 10px 12px 24px; }
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 12px; }
@@ -490,8 +486,7 @@
     const visibleNodes = atHome ? nodes : nodes.filter((n) => !isInPhrase(n.id));
 
     view.innerHTML = atHome
-      ? `<header class="top"><h1>El meu Comunicador</h1><p>Toca una categoria</p></header>
-         <main><div class="grid" id="grid"></div></main>`
+      ? `<main><div class="grid" id="grid"></div></main>`
       : `<div class="level-nav">
            <button class="back-btn" id="back-btn" aria-label="Enrere, torna a ${parent.label}">
              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1F2530" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
