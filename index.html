@@ -74,13 +74,13 @@
   #main-split { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
   #left-panel {
-    height: 42%; flex-shrink: 0;
+    height: 46%; flex-shrink: 0;
     overflow-y: auto;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     padding: 12px 12px 14px;
   }
-  #left-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  #left-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .empty-left {
     color: var(--text-dim); font-size: 0.82rem; text-align: center;
     border: 2px dashed var(--border); border-radius: var(--radius-lg);
@@ -198,9 +198,7 @@
 
     <div id="main-split">
       <div id="left-panel">
-        <div id="left-grid">
-          <div class="empty-left" id="empty-left" style="grid-column: 1 / -1;">Toca un pictograma per veure el vídeo i la imatge aquí</div>
-        </div>
+        <div id="left-grid"></div>
       </div>
       <div id="right-panel">
         <div id="view"></div>
@@ -273,7 +271,6 @@
   const delBtn = document.getElementById("del-btn");
   const clearBtn = document.getElementById("clear-btn");
   const leftGrid = document.getElementById("left-grid");
-  const emptyLeft = document.getElementById("empty-left");
 
   let navStack = [];
   let currentColor = null;
@@ -399,7 +396,6 @@
   }
 
   function appendLeftCard(word) {
-    if (emptyLeft) emptyLeft.hidden = true;
     const idx = phrase.length - 1;
     leftGrid.appendChild(buildComboCard(word, idx));
     leftGrid.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -407,10 +403,7 @@
 
   function renderLeftPanel() {
     leftGrid.innerHTML = "";
-    if (phrase.length === 0) {
-      leftGrid.innerHTML = `<div class="empty-left" id="empty-left" style="grid-column: 1 / -1;">Toca un pictograma per veure el vídeo i la imatge aquí</div>`;
-      return;
-    }
+    if (phrase.length === 0) return;
     phrase.forEach((word, idx) => leftGrid.appendChild(buildComboCard(word, idx)));
   }
 
